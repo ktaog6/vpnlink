@@ -91,10 +91,7 @@ cd $HomeDir || exit 1
 
 read -p "Please choose your system:[mac|rpi]" -t 10 sys
 sys=`echo $sys|tr A-Z a-z|tr -s " "`
-if [ "${sys}x" == "x" ]; then
-    echo "I can't get your system infomation,i'm exit. Bye :(";
-    exit 0;
-elif [ "${sys}x" == 'macx' ]; then
+if [ "${sys}x" == 'macx' ]; then
     echo "I'm running on a mac system,only client function can be used!";
     read -p "Route operate:[add|delete]" -t 10 routeop;
     routeop=`echo $routeop|tr A-Z a-z|tr -s " "`
@@ -117,6 +114,43 @@ elif [ "${sys}x" == 'macx' ]; then
     fi
 elif [ "${sys}x" == "rpix" ];then
     echo "I'm running a rpi system,i can be a route or a client :)"
+    if [ -z "`whereis openconnect |cut -d' ' -f2|grep '/'`" ]; then
+        echo "I need openconnect! I'm trying install it :)";
+        apt-get -y update
+        apt-get -y install openconnect
+        if [ -z "`whereis openconnect |cut -d' ' -f2|grep '/'`" ]; then
+            echo "I need openconnect,but i cann't install it :(";
+            exit 0;
+        fi
+    fi
+    read -p "Nat Src IP Config:[1(192.168.13.0/24)|2(New)]" -t 10 srcip;
+    srcip=`echo ${srcip}|tr -s " "`
+    if [ "${srcip}x" == "1x" ]; then
+        srcip="192.168.13.0/24";
+    else
+        read -p "Your SRC IP Range:" -t 60 srcip;
+        srcip=`echo ${srcip}|tr -s " "`;
+    fi
+    read -p "Choose ISP:[cnc|ct|auto]" -t 20 isp;
+    read -p "Username:" -t 60 usr;
+    read -s -p "Password:" -t 60 pwd;
+    isp=`echo $isp|tr A-Z a-z|tr -s " "`;
+    if [ "${isp}x" == "ctx" ];then
+        echo ${pwd}|openconnect -b --no-cert-check --authgroup=RSA_Token_Auth --user=${usr} --passwd-on-stdin ct-vpn.baidu.com
+    elif [ "${isp}x" == "cncx" ];then
+        echo ${pwd}|openconnect -b --no-cert-check --authgroup=RSA_Token_Auth --user=${usr} --passwd-on-stdin cnc-vpn.baidu.com
+    else
+        echo "I'll location by your local dns :)"
+        echo ${pwd}|openconnect -b --no-cert-check --authgroup=RSA_Token_Auth --user=${usr} --passwd-on-stdin vpn.baidu.com
+    fi
+    iptables -t nat -I POSTROUTING -s ${srcip} -o tun0 -j MASQUERADE
+    echo 1 > /proc/sys/net/ipv4/ip_forward
+    clear
+    echo "==============        vpn connected          =============="
+    echo "=== run 'ifconfig' | 'route -n' | 'iptables' to check!  ==="
+else
+    echo "I can't get your system infomation,i'm exit. Bye :(";
+    exit 0;
 fi
 
 _end_msg
